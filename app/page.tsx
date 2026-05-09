@@ -561,6 +561,25 @@ export default function Home() {
           >
             {/* Remote Video (Primary) */}
             <div className="flex-1 relative bg-gray-900">
+              <div className="flex justify-center mt-5 max-h-[100px]">
+                <div className="bg-gray-800/50 rounded-2xl p-4">
+                  <p className="text-xs text-gray-500 mb-2">Your ID</p>
+                  <code className="text-green-400 font-mono text-sm break-all">
+                    {peerId || "Loading..."}
+                  </code>
+                  <button
+                    onClick={copyId}
+                    className="mt-2 text-xs text-green-500 hover:text-green-400 flex items-center gap-1 mx-auto"
+                  >
+                    {copied ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                    {copied ? "Copied" : "Copy ID"}
+                  </button>
+                </div>
+              </div>
               <video
                 ref={remoteVideoRef}
                 autoPlay
@@ -569,17 +588,13 @@ export default function Home() {
               />
 
               {/* Remote Video Placeholder */}
-              {(!remoteVideoRef.current?.srcObject || !isInCall) && (
+              {/* {(!remoteVideoRef.current?.srcObject || !isInCall) && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                   <div className="text-center">
                     <div className="w-24 h-24 mx-auto mb-4 bg-gray-700 rounded-full flex items-center justify-center">
                       <Users className="w-12 h-12 text-gray-500" />
                     </div>
-                    <p className="text-gray-400 text-sm">
-                      {connectionStatus === "connecting"
-                        ? "Connecting..."
-                        : "Waiting for connection"}
-                    </p>
+               
                     {!isInCall && (
                       <div className="mt-6 px-4">
                         <div className="bg-gray-800/50 rounded-2xl p-4">
@@ -603,7 +618,7 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Controls Overlay */}
               {isInCall && (
