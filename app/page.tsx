@@ -14,6 +14,8 @@ import {
   Copy,
   Check,
   Send,
+  MessageCircle,
+  X,
 } from "lucide-react";
 
 interface Message {
@@ -47,6 +49,8 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState("");
 
+  const [showChat, setShowChat] = useState(false);
+
   useEffect(() => {
     initializePeer();
 
@@ -54,10 +58,6 @@ export default function Home() {
       cleanup();
     };
   }, []);
-
-  // ===============================
-  // INITIALIZE PEER
-  // ===============================
 
   const initializePeer = async () => {
     try {
@@ -74,8 +74,6 @@ export default function Home() {
             {
               urls: "stun:stun1.l.google.com:19302",
             },
-
-            // TURN SERVERS
             {
               urls: "turn:openrelay.metered.ca:80",
               username: "openrelayproject",
@@ -91,31 +89,19 @@ export default function Home() {
       });
 
       peer.on("open", (id) => {
-        console.log("✅ Peer Open:", id);
-
         setPeerId(id);
       });
 
       peer.on("call", (call) => {
-        console.log("📞 Incoming Call");
-
         setIncomingCall(call);
       });
 
       peer.on("connection", (conn) => {
-        console.log("📨 Incoming Data Connection");
-
         conn.on("open", () => {
-          console.log("✅ Data Channel Open");
-
           dataConnectionRef.current = conn;
 
           setupDataConnection(conn);
         });
-      });
-
-      peer.on("error", (err) => {
-        console.error("❌ Peer Error:", err);
       });
 
       peerRef.current = peer;
@@ -126,10 +112,6 @@ export default function Home() {
     }
   };
 
-  // ===============================
-  // GET LOCAL STREAM
-  // ===============================
-
   const getLocalStream = async () => {
     try {
       if (localStreamRef.current) {
@@ -137,17 +119,8 @@ export default function Home() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: "user",
-        },
-
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        video: true,
+        audio: true,
       });
 
       localStreamRef.current = stream;
@@ -161,10 +134,6 @@ export default function Home() {
       throw error;
     }
   };
-
-  // ===============================
-  // SETUP LOCAL VIDEO
-  // ===============================
 
   const setupLocalVideo = async () => {
     try {
@@ -180,59 +149,32 @@ export default function Home() {
     }
   };
 
-  // ===============================
-  // CALL HANDLERS
-  // ===============================
-
   const setupCallHandlers = (call: any) => {
     call.on("stream", async (remoteStream: MediaStream) => {
-      console.log("📺 Remote Stream");
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = remoteStream;
 
-      setTimeout(async () => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream;
-
-          try {
-            await remoteVideoRef.current.play();
-          } catch (err) {
-            console.error(err);
-          }
+        try {
+          await remoteVideoRef.current.play();
+        } catch (err) {
+          console.error(err);
         }
-      }, 100);
+      }
     });
 
     call.on("close", () => {
-      console.log("📴 Call Closed");
-
       endCall();
     });
 
-    call.on("error", (err: any) => {
-      console.error("❌ Call Error:", err);
-
+    call.on("error", () => {
       endCall();
     });
-
-    const pc = call.peerConnection;
-
-    if (pc) {
-      pc.addEventListener("iceconnectionstatechange", () => {
-        console.log("ICE:", pc.iceConnectionState);
-      });
-
-      pc.addEventListener("connectionstatechange", () => {
-        console.log("Connection:", pc.connectionState);
-      });
-    }
   };
-
-  // ===============================
-  // START CALL
-  // ===============================
 
   const startCall = async () => {
     if (!remoteId.trim()) {
       alert("Enter Remote Peer ID");
+
       return;
     }
 
@@ -241,22 +183,18 @@ export default function Home() {
 
       const stream = await getLocalStream();
 
-      // DATA CONNECTION
       const conn = peerRef.current?.connect(remoteId, {
         reliable: true,
       });
 
       if (conn) {
         conn.on("open", () => {
-          console.log("✅ Data Channel Open");
-
           dataConnectionRef.current = conn;
 
           setupDataConnection(conn);
         });
       }
 
-      // MEDIA CALL
       const call = peerRef.current?.call(remoteId, stream);
 
       if (!call) {
@@ -277,10 +215,6 @@ export default function Home() {
     }
   };
 
-  // ===============================
-  // ACCEPT CALL
-  // ===============================
-
   const acceptCall = async () => {
     try {
       const stream = await getLocalStream();
@@ -299,19 +233,11 @@ export default function Home() {
     }
   };
 
-  // ===============================
-  // REJECT CALL
-  // ===============================
-
   const rejectCall = () => {
     incomingCall.close();
 
     setIncomingCall(null);
   };
-
-  // ===============================
-  // END CALL
-  // ===============================
 
   const endCall = () => {
     try {
@@ -335,10 +261,6 @@ export default function Home() {
     }
   };
 
-  // ===============================
-  // DATA CONNECTION
-  // ===============================
-
   const setupDataConnection = (conn: any) => {
     conn.on("data", (data: any) => {
       if (data.type === "chat") {
@@ -348,10 +270,6 @@ export default function Home() {
 
     conn.on("error", console.error);
   };
-
-  // ===============================
-  // CHAT
-  // ===============================
 
   const addMessage = (text: string, sender: "local" | "remote") => {
     setMessages((prev) => [
@@ -379,10 +297,6 @@ export default function Home() {
     setMessageInput("");
   };
 
-  // ===============================
-  // TOGGLE MIC
-  // ===============================
-
   const toggleMic = () => {
     const track = localStreamRef.current?.getAudioTracks()?.at(0);
 
@@ -392,10 +306,6 @@ export default function Home() {
 
     setMicEnabled(track.enabled);
   };
-
-  // ===============================
-  // TOGGLE CAMERA
-  // ===============================
 
   const toggleCamera = () => {
     const track = localStreamRef.current?.getVideoTracks()?.at(0);
@@ -407,10 +317,6 @@ export default function Home() {
     setCameraEnabled(track.enabled);
   };
 
-  // ===============================
-  // COPY ID
-  // ===============================
-
   const copyId = async () => {
     await navigator.clipboard.writeText(peerId);
 
@@ -420,10 +326,6 @@ export default function Home() {
       setCopied(false);
     }, 2000);
   };
-
-  // ===============================
-  // CLEANUP
-  // ===============================
 
   const cleanup = () => {
     try {
@@ -442,150 +344,168 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
-      {/* HEADER */}
+    <div className="h-screen w-full bg-[#0b141a] text-white overflow-hidden relative">
+      {/* REMOTE VIDEO */}
 
-      <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className="absolute inset-0 w-full h-full object-cover bg-black"
+      />
+
+      {/* OVERLAY */}
+
+      <div className="absolute inset-0 bg-black/30" />
+
+      {/* TOP BAR */}
+
+      <div className="absolute top-0 left-0 right-0 z-30 h-16 bg-gradient-to-b from-black/70 to-transparent px-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">GlideCall</h1>
+          <h1 className="font-semibold text-lg">GlideCall</h1>
 
-          <p className="text-sm text-gray-400">Secure P2P Video Call</p>
+          <p className="text-xs text-gray-300">
+            {isInCall ? "Connected" : "Secure Video Call"}
+          </p>
         </div>
 
-        <button
-          onClick={copyId}
-          className="bg-gray-800 px-4 py-2 rounded-xl flex items-center gap-2"
-        >
-          {copied ? (
-            <Check className="w-4 h-4" />
-          ) : (
-            <Copy className="w-4 h-4" />
-          )}
-          Copy ID
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={copyId}
+            className="w-11 h-11 rounded-full bg-[#202c33]/90 backdrop-blur-xl flex items-center justify-center border border-[#2a3942]"
+          >
+            {copied ? (
+              <Check className="w-5 h-5 text-green-400" />
+            ) : (
+              <Copy className="w-5 h-5" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="w-11 h-11 rounded-full bg-[#202c33]/90 backdrop-blur-xl flex items-center justify-center border border-[#2a3942]"
+          >
+            {showChat ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <MessageCircle className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* MAIN */}
+      {/* WAITING */}
 
-      <div className="flex-1 grid md:grid-cols-2 gap-4 p-4">
-        {/* LOCAL VIDEO */}
-
-        <div className="relative bg-gray-900 rounded-2xl overflow-hidden">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
-
-          <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-full text-sm">
-            You
+      {!isInCall && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+          <div className="w-28 h-28 rounded-full bg-[#202c33] flex items-center justify-center mb-6">
+            <Phone className="w-12 h-12 text-green-400" />
           </div>
-        </div>
 
-        {/* REMOTE VIDEO */}
+          <h2 className="text-3xl font-semibold mb-2">Waiting for Call</h2>
 
-        <div className="relative bg-gray-900 rounded-2xl overflow-hidden">
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            controls={false}
-            className="w-full h-full object-cover"
-          />
+          <p className="text-gray-300 mb-6 text-center px-5">
+            Share your peer ID to start secure call
+          </p>
 
-          {!isInCall && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              Waiting for connection...
+          <div className="bg-[#202c33]/90 backdrop-blur-xl border border-[#2a3942] rounded-2xl p-4 w-[90%] max-w-md">
+            <p className="text-xs text-gray-400 mb-2">YOUR PEER ID</p>
+
+            <div className="text-green-400 font-mono break-all">
+              {peerId || "Generating..."}
             </div>
-          )}
+
+            <div className="flex gap-2 mt-4">
+              <input
+                value={remoteId}
+                onChange={(e) => setRemoteId(e.target.value)}
+                placeholder="Enter Remote Peer ID"
+                className="flex-1 bg-[#111b21] rounded-xl px-4 py-3 outline-none"
+              />
+
+              <button
+                onClick={startCall}
+                disabled={isConnecting}
+                className="w-14 rounded-xl bg-green-500 hover:bg-green-600 flex items-center justify-center"
+              >
+                {isConnecting ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Phone className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* LOCAL VIDEO */}
+
+      <div className="absolute top-20 right-4 z-20 w-32 h-48 md:w-60 md:h-40 rounded-2xl overflow-hidden border border-[#2a3942] shadow-2xl bg-black">
+        <video
+          ref={localVideoRef}
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-full object-cover scale-x-[-1]"
+        />
       </div>
 
-      {/* CONTROLS */}
+      {/* CHAT PANEL */}
 
-      <div className="p-4 border-t border-gray-800 space-y-4">
-        {/* YOUR ID */}
+      <div
+        className={`absolute top-0 right-0 h-full w-full md:w-[380px] bg-[#202c33]/95 backdrop-blur-2xl border-l border-[#2a3942] z-40 flex flex-col transition-all duration-300 ${
+          showChat ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        {/* HEADER */}
 
-        <div className="bg-gray-900 rounded-xl p-3">
-          <p className="text-sm text-gray-400">Your Peer ID</p>
+        <div className="h-16 px-4 border-b border-[#2a3942] flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-lg">Messages</h2>
 
-          <code className="text-green-400 break-all">{peerId}</code>
+            <p className="text-xs text-gray-400">Secure Chat</p>
+          </div>
+
+          <button
+            onClick={() => setShowChat(false)}
+            className="w-10 h-10 rounded-full hover:bg-[#2a3942] flex items-center justify-center"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-
-        {/* REMOTE ID */}
-
-        {!isInCall && (
-          <div className="flex gap-2">
-            <input
-              value={remoteId}
-              onChange={(e) => setRemoteId(e.target.value)}
-              placeholder="Enter Remote Peer ID"
-              className="flex-1 bg-gray-900 rounded-xl px-4 py-3 outline-none"
-            />
-
-            <button
-              onClick={startCall}
-              disabled={isConnecting}
-              className="bg-green-500 hover:bg-green-600 px-6 rounded-xl"
-            >
-              <Phone />
-            </button>
-          </div>
-        )}
-
-        {/* CALL CONTROLS */}
-
-        {isInCall && (
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={toggleMic}
-              className={`p-4 rounded-full ${
-                micEnabled ? "bg-gray-800" : "bg-red-500"
-              }`}
-            >
-              {micEnabled ? <Mic /> : <MicOff />}
-            </button>
-
-            <button onClick={endCall} className="p-4 rounded-full bg-red-500">
-              <PhoneOff />
-            </button>
-
-            <button
-              onClick={toggleCamera}
-              className={`p-4 rounded-full ${
-                cameraEnabled ? "bg-gray-800" : "bg-red-500"
-              }`}
-            >
-              {cameraEnabled ? <Video /> : <VideoOff />}
-            </button>
-          </div>
-        )}
 
         {/* CHAT */}
 
-        <div className="bg-gray-900 rounded-2xl p-4 h-64 flex flex-col">
-          <div className="flex-1 overflow-y-auto space-y-2">
-            {messages.map((msg) => (
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          {messages.length === 0 && (
+            <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+              No messages yet
+            </div>
+          )}
+
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${
+                msg.sender === "local" ? "justify-end" : "justify-start"
+              }`}
+            >
               <div
-                key={msg.id}
-                className={`flex ${
-                  msg.sender === "local" ? "justify-end" : "justify-start"
+                className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
+                  msg.sender === "local" ? "bg-[#005c4b]" : "bg-[#111b21]"
                 }`}
               >
-                <div
-                  className={`px-4 py-2 rounded-2xl max-w-xs ${
-                    msg.sender === "local" ? "bg-green-500" : "bg-gray-700"
-                  }`}
-                >
-                  {msg.text}
-                </div>
+                {msg.text}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          <div className="flex gap-2 mt-4">
+        {/* INPUT */}
+
+        <div className="p-3 border-t border-[#2a3942]">
+          <div className="flex gap-2">
             <input
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
@@ -595,39 +515,78 @@ export default function Home() {
                 }
               }}
               placeholder="Type message..."
-              className="flex-1 bg-black rounded-xl px-4 py-2 outline-none"
+              className="flex-1 bg-[#111b21] rounded-full px-5 py-3 outline-none"
             />
 
             <button
               onClick={sendMessage}
-              className="bg-green-500 px-4 rounded-xl"
+              className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center"
             >
-              <Send />
+              <Send className="w-5 h-5" />
             </button>
           </div>
         </div>
       </div>
 
+      {/* CONTROLS */}
+
+      {isInCall && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30">
+          <div className="bg-[#202c33]/95 backdrop-blur-xl border border-[#2a3942] rounded-full px-6 py-4 flex items-center gap-5 shadow-2xl">
+            <button
+              onClick={toggleMic}
+              className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                micEnabled ? "bg-[#2a3942]" : "bg-red-500"
+              }`}
+            >
+              {micEnabled ? <Mic /> : <MicOff />}
+            </button>
+
+            <button
+              onClick={endCall}
+              className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center"
+            >
+              <PhoneOff />
+            </button>
+
+            <button
+              onClick={toggleCamera}
+              className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                cameraEnabled ? "bg-[#2a3942]" : "bg-red-500"
+              }`}
+            >
+              {cameraEnabled ? <Video /> : <VideoOff />}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* INCOMING CALL */}
 
       {incomingCall && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-8 rounded-3xl text-center">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#202c33] p-8 rounded-3xl text-center w-[90%] max-w-sm border border-[#2a3942]">
+            <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-5 animate-pulse">
+              <Phone className="w-10 h-10" />
+            </div>
+
             <h2 className="text-2xl font-bold mb-2">Incoming Call</h2>
 
-            <p className="text-gray-400 mb-6">{incomingCall.peer}</p>
+            <p className="text-gray-400 text-sm break-all mb-8">
+              {incomingCall.peer}
+            </p>
 
-            <div className="flex gap-4 justify-center">
+            <div className="flex justify-center gap-5">
               <button
                 onClick={rejectCall}
-                className="bg-red-500 p-4 rounded-full"
+                className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center"
               >
                 <PhoneOff />
               </button>
 
               <button
                 onClick={acceptCall}
-                className="bg-green-500 p-4 rounded-full"
+                className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center"
               >
                 <Phone />
               </button>
