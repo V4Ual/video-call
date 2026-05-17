@@ -119,7 +119,12 @@ export default function Home() {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user",
+          aspectRatio: 16 / 9,
+        },
         audio: true,
       });
 
@@ -142,7 +147,13 @@ export default function Home() {
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
 
-        await localVideoRef.current.play();
+        localVideoRef.current.onloadedmetadata = async () => {
+          try {
+            await localVideoRef.current?.play();
+          } catch (err) {
+            console.error(err);
+          }
+        };
       }
     } catch (error) {
       console.error(error);
@@ -154,11 +165,13 @@ export default function Home() {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
 
-        try {
-          await remoteVideoRef.current.play();
-        } catch (err) {
-          console.error(err);
-        }
+        remoteVideoRef.current.onloadedmetadata = async () => {
+          try {
+            await remoteVideoRef.current?.play();
+          } catch (err) {
+            console.error(err);
+          }
+        };
       }
     });
 
@@ -166,7 +179,9 @@ export default function Home() {
       endCall();
     });
 
-    call.on("error", () => {
+    call.on("error", (err: any) => {
+      console.error(err);
+
       endCall();
     });
   };
@@ -243,11 +258,13 @@ export default function Home() {
     try {
       if (currentCallRef.current) {
         currentCallRef.current.close();
+
         currentCallRef.current = null;
       }
 
       if (dataConnectionRef.current) {
         dataConnectionRef.current.close();
+
         dataConnectionRef.current = null;
       }
 
@@ -347,22 +364,24 @@ export default function Home() {
     <div className="h-screen w-full bg-[#0b141a] text-white overflow-hidden relative">
       {/* REMOTE VIDEO */}
 
-      <video
-        ref={remoteVideoRef}
-        autoPlay
-        playsInline
-        className="absolute inset-0 w-full h-full object-cover bg-black"
-      />
+      <div className="absolute inset-0 bg-black flex items-center justify-center overflow-hidden">
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-contain bg-black"
+        />
+      </div>
 
       {/* OVERLAY */}
 
-      <div className="absolute inset-0 bg-black/30" />
+      <div className="absolute inset-0 bg-black/20" />
 
       {/* TOP BAR */}
 
       <div className="absolute top-0 left-0 right-0 z-30 h-16 bg-gradient-to-b from-black/70 to-transparent px-4 flex items-center justify-between">
         <div>
-          <h1 className="font-semibold text-lg">GlideCall</h1>
+          <h1 className="font-semibold text-lg">Video Chat</h1>
 
           <p className="text-xs text-gray-300">
             {isInCall ? "Connected" : "Secure Video Call"}
@@ -394,7 +413,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* WAITING */}
+      {/* WAITING SCREEN */}
 
       {!isInCall && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
@@ -458,8 +477,6 @@ export default function Home() {
           showChat ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        {/* HEADER */}
-
         <div className="h-16 px-4 border-b border-[#2a3942] flex items-center justify-between">
           <div>
             <h2 className="font-semibold text-lg">Messages</h2>
@@ -474,8 +491,6 @@ export default function Home() {
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* CHAT */}
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {messages.length === 0 && (
@@ -501,8 +516,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-
-        {/* INPUT */}
 
         <div className="p-3 border-t border-[#2a3942]">
           <div className="flex gap-2">
