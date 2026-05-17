@@ -118,12 +118,33 @@ export default function Home() {
         return localStreamRef.current;
       }
 
+      // CHECK PERMISSIONS FIRST
+      const cameraPermission = await navigator.permissions.query({
+        name: "camera" as PermissionName,
+      });
+
+      const micPermission = await navigator.permissions.query({
+        name: "microphone" as PermissionName,
+      });
+
+      // IF BLOCKED
+      if (
+        cameraPermission.state === "denied" ||
+        micPermission.state === "denied"
+      ) {
+        alert(
+          "Camera/Microphone permission is blocked.\n\nPlease enable it manually:\n\n1. Click the lock icon in browser address bar\n2. Allow Camera & Microphone\n3. Refresh page",
+        );
+
+        throw new Error("Permissions blocked");
+      }
+
+      // REQUEST MEDIA
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: "user",
-          aspectRatio: 16 / 9,
         },
         audio: true,
       });
@@ -131,10 +152,15 @@ export default function Home() {
       localStreamRef.current = stream;
 
       return stream;
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
 
-      alert("Camera / microphone permission denied");
+      // FIRST TIME DENY
+      if (error.name === "NotAllowedError") {
+        alert(
+          "Camera & microphone access denied.\n\nPlease click Allow when browser asks permission.",
+        );
+      }
 
       throw error;
     }
